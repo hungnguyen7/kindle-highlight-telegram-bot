@@ -163,4 +163,4 @@ cython_debug/
 .vscode/
 highlights.*
 highlights/
-database/db.*
+database/__pycache__/

@@ -2,16 +2,14 @@ import re
 import json
 import random
 import os
+from database.highlights import Highlights
 
-highlights_caches = {}
-last_modified_times = {}
+# Initialize highlights database
+highlights_db = Highlights()
 
 
-def process_highlights(txt_file_path, json_file_path):
-    # * Read the txt file
-    with open(txt_file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
-
+def process_highlights_from_content(content):
+    """Process highlights from file content and return list of highlights"""
     # * Split content by \n and remove empty lines
     lines = content.split("\n")
     lines = [line for line in lines if line.strip()]
@@ -37,62 +35,41 @@ def process_highlights(txt_file_path, json_file_path):
     pattern = r"^- Your (Highlight|Bookmark|Note) on (page [0-9]+ \| )?Location ([0-9]+(?:-[0-9]+)?) \| Added on (.*?)$"
     for highlight in pre_proceeded_highlights:
         match = re.findall(pattern, highlight[1], re.MULTILINE | re.DOTALL)
+        if not match:
+            continue
+            
         book_title = highlight[0].strip()
-        # book_type = match[0][0].strip()
-        # page_info = match[0][1].strip() if match[0][1] else "N/A"
         location = match[0][2].strip()
         timestamp = match[0][3].strip()
         text = highlight[2].strip()
         highlights.append({
             "book_title": book_title,
-            # "type": book_type,
-            # "page_info": page_info,
             "location": location,
             "timestamp": timestamp,
             "text": text
         })
 
-    # * Save highlights to a JSON file
-    with open(json_file_path, 'w', encoding='utf-8') as json_file:
-        json.dump(highlights, json_file, indent=4, ensure_ascii=False)
+    return highlights
 
 
-def store_highlights(file_path, file_content):
-    with open(file_path, 'wb') as file:
-        file.write(file_content)
+def store_and_process_highlights(chat_id, file_content):
+    """Store and process highlights from uploaded file content"""
+    # Decode content if it's bytes
+    if isinstance(file_content, bytes):
+        content = file_content.decode('utf-8')
+    else:
+        content = file_content
+    
+    # Process highlights from content
+    highlights = process_highlights_from_content(content)
+    
+    # Store in database
+    highlights_db.add_highlights(chat_id, highlights)
 
 
-def store_and_process_highlights(message_id, file_content):
-    os.makedirs(f"highlights/{message_id}", exist_ok=True)
-
-    txt_file_path = f"highlights/{message_id}/original_highlights.txt"
-    json_file_path = f"highlights/{message_id}/processed_highlights.json"
-
-    store_highlights(txt_file_path, file_content)
-    process_highlights(txt_file_path, json_file_path)
-
-
-def load_random_highlight(message_id):
-    global highlights_caches, last_modified_times
-
-    json_file_path = f"highlights/{message_id}/processed_highlights.json"
-
-    if not os.path.exists(json_file_path):
-        return None
-
-    current_modified_time = os.path.getmtime(json_file_path)
-
-    # * If the highlights are not cached or the file has been modified since the last cache then update the cache with the new highlights from the file
-    if message_id not in highlights_caches or current_modified_time > last_modified_times[message_id]:
-        with open(json_file_path, 'r', encoding='utf-8') as json_file:
-            highlights_caches[message_id] = json.load(json_file)
-
-        # * Update the last modified time
-        last_modified_times[message_id] = current_modified_time
-
-    # * Select a random highlight from the cached highlights based on the message_id
-    random_highlight = random.choice(highlights_caches[message_id])
-    return random_highlight
+def load_random_highlight(chat_id):
+    """Load a random highlight for the given chat_id"""
+    return highlights_db.get_random_highlight(chat_id)
 
 
 # * Helper function to format the highlights

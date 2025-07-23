@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import telebot
 import os
 import schedule
+import time
 from utils.highlight_handler import store_and_process_highlights, load_random_highlight, format_highlight
 import threading
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,6 +11,10 @@ from database.schedules import Schedules
 # * Load environment variables
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+PORT = int(os.getenv("PORT", 5000))
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN environment variable is required")
 
 # * Initialize the bot
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -137,6 +142,7 @@ def send_scheduled_highlight(chat_id):
 def run_scheduler():
     while True:
         schedule.run_pending()
+        time.sleep(1)  # Prevent high CPU usage
 
 
 def rerun_schedules():
